@@ -247,68 +247,6 @@ jobs:
             ./lapce-proxy-linux-*.gz
           retention-days: 1
 
-  macos:
-    runs-on: macos-14
-    needs: tagname
-    env:
-      RELEASE_TAG_NAME: ${{ needs.tagname.outputs.tag_name }}
-
-      NOTARIZE_USERNAME: ${{ secrets.NOTARIZE_USERNAME }}
-      NOTARIZE_PASSWORD: ${{ secrets.NOTARIZE_PASSWORD }}
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install ARM target
-        run: rustup update && rustup target add x86_64-apple-darwin
-
-      - name: Import Certificate
-        uses: Apple-Actions/import-codesign-certs@v3
-        with:
-          p12-file-base64: ${{ secrets.MACOS_CERTIFICATE }}
-          p12-password: ${{ secrets.MACOS_CERTIFICATE_PWD }}
-
-      - name: Select newer Xcode for building
-        run: |
-          sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer
-
-      - name: Fetch dependencies
-        run: cargo fetch --locked
-
-      - name: Make DMG
-        run: make dmg-universal
-
-      - name: Rename
-        run: |
-          cp ./target/release-lto/macos/Lapce.dmg ./target/release-lto/macos/Lapce-macos.dmg
-
-      - name: Gzip lapce-proxy
-        run: |
-          gzip -c ./target/x86_64-apple-darwin/release-lto/lapce-proxy > ./target/release-lto/macos/lapce-proxy-darwin-x86_64.gz
-          gzip -c ./target/aarch64-apple-darwin/release-lto/lapce-proxy > ./target/release-lto/macos/lapce-proxy-darwin-aarch64.gz
-
-      - name: Notarize Release Build
-        uses: lando/notarize-action@v2
-        with:
-          product-path: "./target/release-lto/macos/Lapce-macos.dmg"
-          appstore-connect-username: ${{ secrets.NOTARIZE_USERNAME }}
-          appstore-connect-password: ${{ secrets.NOTARIZE_PASSWORD }}
-          appstore-connect-team-id: CYSGAZFR8D
-          primary-bundle-id: "io.lapce"
-
-      - name: "Staple Release Build"
-        uses: lapce/xcode-staple@062485d6eeafe841c18a412f012e80f49e23c517
-        with:
-          product-path: "./target/release-lto/macos/Lapce-macos.dmg"
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: lapce-macos
-          path: |
-            ./target/release-lto/macos/lapce-proxy-darwin-*.gz
-            ./target/release-lto/macos/Lapce-macos.dmg
-          retention-days: 3
-
   publish:
     needs:
       - linux
@@ -316,7 +254,6 @@ jobs:
       - deb
       - rpm
       - windows
-      - macos
     runs-on: ubuntu-latest
     env:
       GH_REPO: ${{ github.repository }}
